@@ -1,353 +1,264 @@
-import re
 from pathlib import Path
 
 import pandas as pd
-import streamlit as st
+from flask import Flask, jsonify, render_template, request
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-from flask import Flask
-app = Flask(__name__)
 
-# ----------------------------
-# Page configuration
-# ----------------------------
-st.set_page_config(
-    page_title="Book Recommendation System",
-    page_icon="📚",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+app = Flask(__name__)
 
 DATA_PATH = Path(__file__).parent / "books_preprocessed.csv"
 
+REQUIRED_COLUMNS = [
+    "Book_ID",
+    "Book_Name",
+    "Author",
+    "Genre",
+    "Description",
+    "Rating",
+    "Publish_Year",
+]
 
-# ----------------------------
-# Load and prepare dataset
-# ----------------------------
-@st.cache_data
-def load_books(csv_path: str) -> pd.DataFrame:
-    books = pd.read_csv(csv_path)
+books = pd.DataFrame()
+similarity_matrix = None
 
-    required_columns = [
-        "Book_ID", "Book_Name", "Author", "Genre",
-        "Description", "Rating", "Publish_Year"
-    ]
-    missing_columns = [col for col in required_columns if col not in books.columns]
-    if missing_columns:
-        raise ValueError(
-            "Dataset-ல் தேவையான columns இல்லை: " + ", ".join(missing_columns)
+
+def load_books():
+    """Load and clean the CSV dataset."""
+    if not DATA_PATH.exists():
+        raise FileNotFoundError(
+            f"Dataset not found: {DATA_PATH}"
         )
 
-    # Clean text fields
-    text_columns = ["Book_ID", "Book_Name", "Author", "Genre", "Description"]
-    for col in text_columns:
-        books[col] = books[col].fillna("").astype(str).str.strip()
-        books[col] = books[col].str.replace(r"\s+", " ", regex=True)
+    df = pd.read_csv(DATA_PATH)
 
-    books["Rating"] = pd.to_numeric(books["Rating"], errors="coerce")
-    books["Publish_Year"] = pd.to_numeric(
-        books["Publish_Year"], errors="coerce"
+    missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
+    if missing:
+        raise ValueError(
+            "Missing CSV columns: " + ", ".join(missing)
+        )
+
+    for col in [
+        "Book_ID",
+        "Book_Name",
+        "Author",
+        "Genre",
+        "Description",
+    ]:
+        df[col] = (
+            df[col]
+            .fillna("")
+            .astype(str)
+            .str.replace(r"\s+", " ", regex=True)
+            .str.strip()
+        )
+
+    df["Rating"] = pd.to_numeric(df["Rating"], errors="coerce")
+    df["Publish_Year"] = pd.to_numeric(
+        df["Publish_Year"], errors="coerce"
     )
 
-    # Drop rows missing the minimum information needed by the recommender
-    books = books.dropna(subset=["Rating", "Publish_Year"])
-    books = books[
-        (books["Book_Name"] != "") &
-        (books["Author"] != "") &
-        (books["Book_ID"] != "")
+    df = df.dropna(subset=["Rating", "Publish_Year"])
+
+    df = df[
+        df["Book_ID"].ne("")
+        & df["Book_Name"].ne("")
+        & df["Author"].ne("")
     ].copy()
 
-    # Build text used by the content-based recommendation model
-    books["Combined_Text"] = (
-        books["Book_Name"] + " " +
-        books["Author"] + " " +
-        books["Genre"] + " " +
-        books["Description"]
-    ).str.replace(r"\s+", " ", regex=True).str.strip()
+    df = df.drop_duplicates(
+        subset=["Book_ID"]
+    ).reset_index(drop=True)
 
-    books = books.drop_duplicates(subset=["Book_ID"]).reset_index(drop=True)
-    return books
+    if len(df) < 2:
+        raise ValueError(
+            "At least 2 valid books are required."
+        )
+
+    df["Combined_Text"] = (
+        df["Book_Name"] + " "
+        + df["Author"] + " "
+        + df["Genre"] + " "
+        + df["Description"]
+    ).str.strip()
+
+    return df
 
 
-@st.cache_resource
-def build_recommendation_model(text_data: tuple):
-    """Build TF-IDF vectors and cosine similarity matrix."""
+def build_model(df):
+    """Build TF-IDF vectors and cosine similarities."""
     vectorizer = TfidfVectorizer(
         stop_words="english",
         lowercase=True,
         ngram_range=(1, 2),
         max_features=10000,
     )
-    matrix = vectorizer.fit_transform(list(text_data))
-    similarity = cosine_similarity(matrix, dense_output=True)
-    return vectorizer, similarity
+
+    matrix = vectorizer.fit_transform(df["Combined_Text"])
+
+    return cosine_similarity(matrix, dense_output=True)
 
 
-def recommend_books(books: pd.DataFrame, similarity, selected_index: int,
-                    number_of_recommendations: int = 5) -> pd.DataFrame:
-    scores = list(enumerate(similarity[selected_index]))
-    scores = [
-        (idx, score) for idx, score in scores
-        if idx != selected_index
+def serialize_book(row, index=None, score=None):
+    """Convert a book to JSON-safe data."""
+    result = {
+        "Book_ID": str(row["Book_ID"]),
+        "Book_Name": str(row["Book_Name"]),
+        "Author": str(row["Author"]),
+        "Genre": str(row["Genre"]),
+        "Description": str(row["Description"]),
+        "Rating": float(row["Rating"]),
+        "Publish_Year": int(row["Publish_Year"]),
+    }
+
+    if index is not None:
+        result["_index"] = int(index)
+
+    if score is not None:
+        result["Similarity"] = float(score)
+
+    return result
+
+
+@app.get("/")
+def home():
+    return render_template("index.html")
+
+
+@app.get("/api/books")
+def get_books():
+    """Return books and dashboard statistics."""
+    if books.empty:
+        return jsonify({"error": "No books loaded."}), 500
+
+    records = [
+        serialize_book(row)
+        for _, row in books.iterrows()
     ]
-    scores.sort(key=lambda item: item[1], reverse=True)
 
-    results = []
-    for idx, score in scores:
-        row = books.iloc[idx]
-        results.append({
-            "Book_ID": row["Book_ID"],
-            "Book_Name": row["Book_Name"],
-            "Author": row["Author"],
-            "Genre": row["Genre"],
-            "Description": row["Description"],
-            "Rating": row["Rating"],
-            "Publish_Year": int(row["Publish_Year"]),
-            "Similarity": float(score),
-            "_index": idx,
-        })
-        if len(results) >= number_of_recommendations:
-            break
+    genres = sorted(
+        g for g in books["Genre"].unique() if g.strip()
+    )
 
-    return pd.DataFrame(results)
+    return jsonify({
+        "books": records,
+        "total_books": len(books),
+        "total_genres": len(genres),
+        "genres": genres,
+        "average_rating": round(
+            float(books["Rating"].mean()), 2
+        ),
+    })
 
 
-def safe_rating(value) -> str:
+@app.get("/api/recommend/<book_id>")
+def get_recommendations(book_id):
+    """Find similar books using the Python ML model."""
+    matches = books.index[
+        books["Book_ID"].astype(str) == book_id
+    ].tolist()
+
+    if not matches:
+        return jsonify({"error": "Book not found."}), 404
+
+    selected_index = matches[0]
+
     try:
-        return f"{float(value):.2f} / 5"
-    except (TypeError, ValueError):
-        return "Not available"
+        count = int(request.args.get("count", 5))
+        count = max(1, min(count, 10))
+        min_rating = float(
+            request.args.get("min_rating", 0)
+        )
 
+        if not 0 <= min_rating <= 5:
+            raise ValueError("Minimum rating must be 0–5.")
 
-# ----------------------------
-# Load data and handle errors
-# ----------------------------
-st.markdown(
-    """
-    <style>
-    .main-title {font-size: 2.4rem; font-weight: 800; margin-bottom: 0.2rem;}
-    .subtitle {color: #6b7280; font-size: 1.05rem; margin-bottom: 1.4rem;}
-    .book-card {border: 1px solid rgba(128,128,128,.35); border-radius: 14px;
-                padding: 16px; margin-bottom: 10px; min-height: 210px;}
-    .book-title {font-size: 1.1rem; font-weight: 700;}
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
+    except (ValueError, TypeError):
+        return jsonify({"error": "Invalid filter values."}), 400
 
-st.markdown('<div class="main-title">📚 Book Recommendation System</div>',
-            unsafe_allow_html=True)
-st.markdown(
-    '<div class="subtitle">Discover your next favourite book using '
-    'content-based Machine Learning.</div>',
-    unsafe_allow_html=True,
-)
+    genre = request.args.get("genre", "").strip()
+    search = request.args.get("search", "").strip().casefold()
+    sort_by = request.args.get("sort", "similarity")
 
-if not DATA_PATH.exists():
-    st.error(
-        "books_preprocessed.csv file கிடைக்கவில்லை. "
-        "அதை app.py இருக்கும் அதே folder-ல் வைக்கவும்."
-    )
-    st.stop()
+    allowed_sorts = {"similarity", "rating", "year", "title"}
+    if sort_by not in allowed_sorts:
+        sort_by = "similarity"
 
-try:
-    books = load_books(str(DATA_PATH))
-except Exception as exc:
-    st.error(f"Dataset load செய்ய முடியவில்லை: {exc}")
-    st.stop()
+    candidates = []
 
-if len(books) < 2:
-    st.error("Recommendations உருவாக்க குறைந்தது 2 valid books தேவை.")
-    st.stop()
+    for idx, score in enumerate(similarity_matrix[selected_index]):
+        if idx == selected_index:
+            continue
 
-try:
-    _, similarity_matrix = build_recommendation_model(
-        tuple(books["Combined_Text"].tolist())
-    )
-except ValueError as exc:
-    st.error(f"Recommendation model உருவாக்க முடியவில்லை: {exc}")
-    st.stop()
+        row = books.iloc[idx]
 
+        if float(row["Rating"]) < min_rating:
+            continue
 
-# ----------------------------
-# Sidebar filters
-# ----------------------------
-st.sidebar.header("🔎 Search & Filters")
-search_text = st.sidebar.text_input(
-    "Book name அல்லது author search செய்",
-    placeholder="உதா: 1984",
-)
+        if genre and row["Genre"] != genre:
+            continue
 
-all_genres = sorted(
-    genre for genre in books["Genre"].dropna().astype(str).unique()
-    if genre.strip()
-)
-selected_genres = st.sidebar.multiselect(
-    "Genre தேர்வு செய்",
-    options=all_genres,
-    default=[],
-)
+        if search:
+            searchable = (
+                str(row["Book_Name"]) + " "
+                + str(row["Author"])
+            ).casefold()
 
-min_rating = float(books["Rating"].min())
-max_rating = float(books["Rating"].max())
-rating_range = st.sidebar.slider(
-    "Rating range",
-    min_value=0.0,
-    max_value=5.0,
-    value=(max(0.0, min_rating), min(5.0, max_rating)),
-    step=0.1,
-)
+            if search not in searchable:
+                continue
 
-recommendation_count = st.sidebar.selectbox(
-    "எத்தனை recommendations வேண்டும்?",
-    options=[5, 10],
-    index=0,
-)
+        candidates.append({
+            **serialize_book(row, index=idx, score=score)
+        })
 
-st.sidebar.caption(
-    "குறிப்பு: Genre மற்றும் rating filters, book தேர்வு மற்றும் "
-    "recommendation பட்டியலுக்குப் பயன்படுத்தப்படும்."
-)
-
-
-# ----------------------------
-# Main dashboard metrics
-# ----------------------------
-m1, m2, m3 = st.columns(3)
-m1.metric("📚 Total Books", len(books))
-m2.metric("🏷️ Genres", books["Genre"].nunique())
-m3.metric("⭐ Average Rating", f"{books['Rating'].mean():.2f} / 5")
-
-st.divider()
-
-# Apply filters for browsing/selecting
-filtered = books.copy()
-if selected_genres:
-    filtered = filtered[filtered["Genre"].isin(selected_genres)]
-
-filtered = filtered[
-    filtered["Rating"].between(rating_range[0], rating_range[1])
-]
-
-if search_text.strip():
-    q = re.escape(search_text.strip())
-    mask = (
-        filtered["Book_Name"].str.contains(q, case=False, na=False, regex=True) |
-        filtered["Author"].str.contains(q, case=False, na=False, regex=True)
-    )
-    filtered = filtered[mask]
-
-if filtered.empty:
-    st.warning("இந்த search / filters-க்கு books கிடைக்கவில்லை. Filters மாற்றிப் பாருங்கள்.")
-    st.stop()
-
-book_options = {
-    f"{row['Book_Name']} — {row['Author']}": int(idx)
-    for idx, row in filtered.iterrows()
-}
-
-st.subheader("✨ Find Similar Books")
-selected_label = st.selectbox(
-    "உனக்குப் பிடித்த book-ஐ தேர்வு செய்",
-    options=list(book_options.keys()),
-)
-selected_index = book_options[selected_label]
-selected_book = books.loc[selected_index]
-
-left, right = st.columns([1, 2])
-with left:
-    st.markdown("### 📖 Selected Book")
-    st.markdown(f"**{selected_book['Book_Name']}**")
-    st.write(f"**Author:** {selected_book['Author']}")
-    st.write(f"**Genre:** {selected_book['Genre']}")
-    st.write(f"**Rating:** {safe_rating(selected_book['Rating'])}")
-    st.write(f"**Published:** {int(selected_book['Publish_Year'])}")
-with right:
-    st.markdown("### About this book")
-    st.write(selected_book["Description"] or "Description available இல்லை.")
-    st.info(
-        "இந்த system, book title, author, genre மற்றும் description-ஐ "
-        "TF-IDF மூலம் process செய்து Cosine Similarity அடிப்படையில் "
-        "ஒத்த books-ஐ பரிந்துரைக்கிறது."
-    )
-
-if st.button("🔍 Recommend Similar Books", type="primary", use_container_width=True):
-    recommendations = recommend_books(
-        books, similarity_matrix, selected_index, recommendation_count
-    )
-
-    # Respect selected genre and rating filters in the displayed recommendations.
-    recommendations = recommendations[
-        recommendations["Rating"].between(rating_range[0], rating_range[1])
-    ]
-    if selected_genres:
-        recommendations = recommendations[
-            recommendations["Genre"].isin(selected_genres)
-        ]
-
-    st.session_state["recommendations"] = recommendations.drop(columns=["_index"], errors="ignore")
-    st.session_state["recommended_for"] = selected_book["Book_Name"]
-
-if "recommendations" in st.session_state:
-    st.divider()
-    st.subheader(f"🎯 Recommended for: {st.session_state.get('recommended_for', '')}")
-    recs = st.session_state["recommendations"]
-
-    if recs.empty:
-        st.warning(
-            "இந்த filters-க்கு similar books கிடைக்கவில்லை. "
-            "Genre அல்லது rating filter-ஐ மாற்றி மீண்டும் முயற்சி செய்."
+    if sort_by == "rating":
+        candidates.sort(
+            key=lambda b: (-b["Rating"], -b["Similarity"])
+        )
+    elif sort_by == "year":
+        candidates.sort(
+            key=lambda b: (-b["Publish_Year"], -b["Similarity"])
+        )
+    elif sort_by == "title":
+        candidates.sort(
+            key=lambda b: b["Book_Name"].casefold()
         )
     else:
-        cols_per_row = 2
-        for start in range(0, len(recs), cols_per_row):
-            cols = st.columns(cols_per_row)
-            for offset, col in enumerate(cols):
-                pos = start + offset
-                if pos >= len(recs):
-                    break
-                book = recs.iloc[pos]
-                with col:
-                    st.markdown('<div class="book-card">', unsafe_allow_html=True)
-                    st.markdown(
-                        f'<div class="book-title">{pos + 1}. '
-                        f'{book["Book_Name"]}</div>',
-                        unsafe_allow_html=True,
-                    )
-                    st.write(f"✍️ **Author:** {book['Author']}")
-                    st.write(f"🏷️ **Genre:** {book['Genre']}")
-                    st.write(f"⭐ **Rating:** {safe_rating(book['Rating'])}")
-                    st.write(f"📅 **Year:** {int(book['Publish_Year'])}")
-                    st.write(book["Description"] or "Description available இல்லை.")
-                    st.progress(
-                        max(0.0, min(1.0, float(book["Similarity"]))),
-                        text=f"Text similarity: {float(book['Similarity']):.0%}",
-                    )
-                    st.markdown("</div>", unsafe_allow_html=True)
-
-        csv_download = recs.to_csv(index=False).encode("utf-8-sig")
-        st.download_button(
-            "⬇️ Download recommendations as CSV",
-            data=csv_download,
-            file_name="recommended_books.csv",
-            mime="text/csv",
+        candidates.sort(
+            key=lambda b: -b["Similarity"]
         )
 
-with st.expander("📚 Browse all books in the dataset"):
-    browse = books.copy()
-    if selected_genres:
-        browse = browse[browse["Genre"].isin(selected_genres)]
-    browse = browse[browse["Rating"].between(rating_range[0], rating_range[1])]
-    st.dataframe(
-        browse[[
-            "Book_ID", "Book_Name", "Author", "Genre",
-            "Rating", "Publish_Year", "Description"
-        ]],
-        use_container_width=True,
-        hide_index=True,
-    )
+    return jsonify({
+        "selected_book": serialize_book(
+            books.iloc[selected_index]
+        ),
+        "recommendations": candidates[:count],
+        "total_matches": len(candidates),
+    })
 
-st.caption(
-    "Academic prototype • Content-based filtering • "
-    "Similarity score is text similarity, not a guaranteed user preference."
-)
+
+@app.get("/api/health")
+def health():
+    return jsonify({
+        "status": "ready",
+        "total_books": len(books),
+    })
+
+
+# Load the CSV and build the model once when the app starts.
+try:
+    books = load_books()
+    similarity_matrix = build_model(books)
+    print(f"Loaded {len(books)} books successfully.")
+except Exception as exc:
+    raise RuntimeError(
+        f"Could not initialise the recommendation system: {exc}"
+    ) from exc
+
+
+if __name__ == "__main__":
+    app.run(
+        host="127.0.0.1",
+        port=5000,
+        debug=False,
+    )
