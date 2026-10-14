@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PageTurn — Book Recommendation System</title>
+<style>
+:root{--bg:#f7f7fb;--panel:#fff;--ink:#1e2130;--muted:#72778a;--line:#e8e9f1;--purple:#6957d8;--purple2:#eeeaff;--gold:#f0b64a;--green:#178a68;--shadow:0 12px 35px rgba(37,32,84,.07)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,input,select{font:inherit}button{cursor:pointer}
+.shell{max-width:1240px;margin:auto;padding:28px 26px 50px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:30px}
+.brand{display:flex;align-items:center;gap:12px;font-size:21px;font-weight:850;letter-spacing:-.6px}
+.brandmark{width:43px;height:43px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(135deg,#7668ed,#5041bd);color:#fff;font-size:23px;box-shadow:0 8px 18px #6957d844}
+.brand small{display:block;font-size:10px;letter-spacing:1.8px;color:var(--muted);font-weight:700;margin-top:2px}
+.status{font-size:12px;color:var(--green);background:#e6f7f0;border:1px solid #c9efdf;border-radius:30px;padding:9px 13px;font-weight:750}
+.hero{position:relative;overflow:hidden;border-radius:27px;padding:36px 40px;color:#fff;background:linear-gradient(112deg,#29234e 0%,#4e419b 57%,#7667e7 100%);box-shadow:var(--shadow);margin-bottom:23px}
+.hero:after{content:"📚";position:absolute;font-size:145px;right:8%;top:3px;opacity:.13;transform:rotate(-13deg)}
+.eyebrow{font-size:11px;letter-spacing:2.4px;text-transform:uppercase;color:#d8d2ff;font-weight:800}
+.hero h1{font-size:clamp(29px,4vw,46px);line-height:1.08;letter-spacing:-1.8px;margin:12px 0 12px;max-width:650px}
+.hero p{color:#e3e0ff;max-width:610px;line-height:1.65;margin:0 0 23px;font-size:15px}
+.searchrow{display:flex;gap:10px;max-width:680px;position:relative;z-index:1}
+.searchbox{display:flex;align-items:center;gap:10px;background:#fff;border-radius:13px;padding:0 15px;flex:1;min-width:0;color:#686b7c}
+.searchbox input{width:100%;border:0;outline:0;padding:15px 0;color:var(--ink);background:transparent}
+.primary{border:0;background:#fff;color:#4f42b5;font-weight:800;border-radius:12px;padding:0 19px;box-shadow:0 6px 18px #17123a26}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:15px;margin-bottom:25px}
+.metric{background:var(--panel);border:1px solid var(--line);border-radius:17px;padding:18px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 5px 18px #28234a04}
+.metricicon{width:44px;height:44px;border-radius:13px;background:var(--purple2);display:grid;place-items:center;font-size:20px}
+.metric label{display:block;color:var(--muted);font-size:12px;font-weight:650;margin-bottom:4px}
+.metric strong{font-size:23px;letter-spacing:-.7px}
+.layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:22px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:19px;padding:21px;box-shadow:0 5px 18px #28234a04}
+.panel h2{font-size:16px;margin:0 0 19px;letter-spacing:-.3px}
+.filter-group{margin-bottom:22px}.filter-group label{display:block;font-size:12px;font-weight:800;color:#51556a;margin-bottom:9px}
+input[type="text"],select{width:100%;border:1px solid var(--line);background:#fbfbfe;padding:12px 12px;border-radius:10px;color:var(--ink);outline:none}
+input:focus,select:focus{border-color:#9a8df0;box-shadow:0 0 0 3px #6957d81a}
+select{cursor:pointer}
+.genrelist{display:flex;flex-wrap:wrap;gap:7px}
+.chip{border:1px solid var(--line);background:#fff;color:#696d7f;padding:7px 10px;border-radius:30px;font-size:11px;font-weight:750}
+.chip.active{background:var(--purple2);border-color:#c9c1ff;color:#5546c2}
+.range-line{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:8px}
+input[type=range]{width:100%;accent-color:var(--purple)}
+.reset{width:100%;padding:11px;border:1px solid #d9d5fb;border-radius:10px;background:#f8f6ff;color:#5b4bc6;font-weight:800;font-size:12px}
+.contenthead{display:flex;align-items:end;justify-content:space-between;gap:10px;margin:4px 0 15px}
+.contenthead h2{margin:0;font-size:22px;letter-spacing:-.7px}
+.contenthead p{margin:5px 0 0;color:var(--muted);font-size:12px}
+.sort{width:auto;min-width:145px;padding:10px}
+.selected{display:grid;grid-template-columns:76px minmax(0,1fr);gap:17px;padding:20px;margin-bottom:24px;border-radius:18px;background:linear-gradient(120deg,#fff,#f4f1ff);border:1px solid #e2ddff}
+.cover{width:74px;height:100px;border-radius:9px;background:linear-gradient(150deg,#7868e6,#34285e);display:grid;place-items:center;color:#fff;font-size:31px;box-shadow:0 8px 17px #31275b24;flex-shrink:0;position:relative;overflow:hidden}
+.cover:after{content:"";position:absolute;width:48px;height:140px;background:#ffffff14;transform:rotate(35deg);right:-22px;top:-20px}
+.selected h3{margin:1px 0 5px;font-size:19px;letter-spacing:-.4px}
+.meta{font-size:12px;color:var(--muted);line-height:1.8}
+.pill{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.3px;border-radius:30px;background:#ece9ff;color:#5d4bc9;padding:5px 9px;margin:4px 5px 0 0}
+.description{font-size:12px;line-height:1.65;color:#555b70;margin:9px 0 0}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.book{background:#fff;border:1px solid var(--line);border-radius:16px;padding:16px;display:grid;grid-template-columns:62px minmax(0,1fr);gap:13px;transition:.18s;min-height:180px}
+.book:hover{transform:translateY(-2px);box-shadow:var(--shadow);border-color:#d8d1ff}
+.book .cover{width:60px;height:82px;font-size:24px}
+.book h3{font-size:14px;line-height:1.35;margin:0 0 5px}
+.book .meta{font-size:11px}
+.book .description{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin:8px 0}
+.bookfoot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:10px}
+.rating{font-size:11px;color:#97640c;font-weight:850}
+.sim{font-size:10px;color:#5e4dc4;background:#f0edff;padding:5px 7px;border-radius:7px;font-weight:800}
+.cardbtn{border:0;background:transparent;color:#6554d3;font-size:11px;font-weight:850;padding:5px 0}
+.empty{padding:40px 20px;text-align:center;color:var(--muted);background:#fff;border:1px dashed #d9d9e6;border-radius:15px;grid-column:1/-1}
+.footer{text-align:center;font-size:11px;color:#8b8da0;margin-top:27px;line-height:1.7}
+.notice{font-size:11px;color:var(--muted);margin-top:15px}
+@media(max-width:850px){.layout{grid-template-columns:1fr}.metrics{gap:9px}.metric{padding:13px}.metric strong{font-size:20px}.hero{padding:29px 25px}.hero:after{right:-3%;font-size:100px}.grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.shell{padding:16px 13px 35px}.topbar{margin-bottom:18px}.hero{padding:25px 19px}.hero h1{font-size:31px}.hero p{font-size:13px}.searchrow{flex-direction:column}.primary{padding:13px}.metrics{grid-template-columns:1fr}.metric{padding:12px 15px}.metricicon{width:38px;height:38px}.layout{gap:15px}.grid{grid-template-columns:1fr}.contenthead{align-items:start;flex-direction:column}.selected{padding:15px}.status{font-size:10px}.brand{font-size:18px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand"><div class="brandmark">▤</div><div>PageTurn<small>BOOK DISCOVERY STUDIO</small></div></div>
+    <div class="status">● RECOMMENDER READY</div>
+  </header>
+
+  <section class="hero">
+    <div class="eyebrow">Your next chapter starts here</div>
+    <h1>Find a book that feels<br>like it was made for you.</h1>
+    <p>Explore stories, discover new authors, and find books with similar themes using our content-based recommendation engine.</p>
+    <div class="searchrow">
+      <div class="searchbox"><span>⌕</span><input id="search" placeholder="Search by book title or author..." autocomplete="off"></div>
+      <button class="primary" id="searchBtn">Find books →</button>
+    </div>
+  </section>
+
+  <section class="metrics">
+    <div class="metric"><div class="metricicon">📚</div><div><label>Books in library</label><strong id="totalBooks">50</strong></div></div>
+    <div class="metric"><div class="metricicon">🏷️</div><div><label>Genres to explore</label><strong id="totalGenres">—</strong></div></div>
+    <div class="metric"><div class="metricicon">⭐</div><div><label>Average reader rating</label><strong id="avgRating">—</strong></div></div>
+  </section>
+
+  <main class="layout">
+    <aside class="panel">
+      <h2>✦ Refine discovery</h2>
+      <div class="filter-group">
+        <label for="genreSelect">GENRE</label>
+        <select id="genreSelect"><option value="">All genres</option></select>
+      </div>
+      <div class="filter-group">
+        <label for="ratingRange">MINIMUM RATING <span id="ratingLabel">3.5+</span></label>
+        <input id="ratingRange" type="range" min="0" max="5" step=".1" value="3.5">
+        <div class="range-line"><span>Any rating</span><span>5.0 ★</span></div>
+      </div>
+      <div class="filter-group">
+        <label for="sortSelect">SORT BOOKS BY</label>
+        <select id="sortSelect"><option value="similarity">Most similar</option><option value="rating">Highest rated</option><option value="year">Newest first</option><option value="title">Title A–Z</option></select>
+      </div>
+      <button class="reset" id="resetBtn">Reset all filters</button>
+      <div class="notice">Recommendations compare book titles, authors, genres, and descriptions. No account required.</div>
+    </aside>
+
+    <section>
+      <div class="contenthead">
+        <div><h2>Discover your next read</h2><p id="resultCount">Choose a book to get started.</p></div>
+        <select class="sort" id="countSelect" aria-label="Number of recommendations"><option value="5">Top 5 picks</option><option value="10">Top 10 picks</option></select>
+      </div>
+      <div id="selectedBook" class="selected" style="display:none"></div>
+      <div id="recommendations" class="grid"></div>
+      <div class="footer">PAGETURN · BOOK RECOMMENDATION SYSTEM<br>Powered by TF-IDF-style text features and cosine similarity · Similarity scores reflect text similarity, not guaranteed preference.</div>
+    </section>
+  </main>
+</div>
+<script>
+const BOOKS = [{"Book_ID": "B001", "Book_Name": "To Kill a Mockingbird", "Author": "Harper Lee", "Genre": "Fiction", "Description": "A young girl in the American South watches her lawyer father defend a Black man falsely accused of a crime.", "Rating": 4.27, "Publish_Year": 1960}, {"Book_ID": "B002", "Book_Name": "1984", "Author": "George Orwell", "Genre": "Dystopian", "Description": "A man rebels against a totalitarian state that watches and controls every part of life.", "Rating": 4.19, "Publish_Year": 1949}, {"Book_ID": "B003", "Book_Name": "Pride and Prejudice", "Author": "Jane Austen", "Genre": "Romance", "Description": "Elizabeth Bennet and Mr. Darcy overcome pride and first impressions in Regency England.", "Rating": 4.28, "Publish_Year": 1813}, {"Book_ID": "B004", "Book_Name": "The Great Gatsby", "Author": "F. Scott Fitzgerald", "Genre": "Classic", "Description": "A mysterious millionaire chases a lost love amid the excess of the Jazz Age.", "Rating": 3.93, "Publish_Year": 1925}, {"Book_ID": "B005", "Book_Name": "The Hobbit", "Author": "J.R.R. Tolkien", "Genre": "Fantasy", "Description": "Bilbo Baggins joins a band of dwarves on a quest to reclaim a mountain from a dragon.", "Rating": 4.28, "Publish_Year": 1937}, {"Book_ID": "B006", "Book_Name": "Harry Potter and the Sorcerer's Stone", "Author": "J.K. Rowling", "Genre": "Fantasy", "Description": "An orphan discovers he is a wizard and begins his first year at Hogwarts.", "Rating": 4.47, "Publish_Year": 1997}, {"Book_ID": "B007", "Book_Name": "The Catcher in the Rye", "Author": "J.D. Salinger", "Genre": "Fiction", "Description": "A restless teenager wanders New York after being expelled from school.", "Rating": 3.81, "Publish_Year": 1951}, {"Book_ID": "B008", "Book_Name": "The Alchemist", "Author": "Paulo Coelho", "Genre": "Adventure", "Description": "A shepherd boy travels in search of treasure and learns to follow his dreams.", "Rating": 3.89, "Publish_Year": 1988}, {"Book_ID": "B009", "Book_Name": "Sapiens", "Author": "Yuval Noah Harari", "Genre": "Non-Fiction", "Description": "A sweeping history of humankind from the Stone Age to the modern era.", "Rating": 4.39, "Publish_Year": 2011}, {"Book_ID": "B010", "Book_Name": "Atomic Habits", "Author": "James Clear", "Genre": "Self-Help", "Description": "A practical guide to building good habits and breaking bad ones through small changes.", "Rating": 4.37, "Publish_Year": 2018}, {"Book_ID": "B011", "Book_Name": "The Da Vinci Code", "Author": "Dan Brown", "Genre": "Thriller", "Description": "A symbologist races to solve a murder and uncover a secret hidden in famous artworks.", "Rating": 3.82, "Publish_Year": 2003}, {"Book_ID": "B012", "Book_Name": "Gone Girl", "Author": "Gillian Flynn", "Genre": "Thriller", "Description": "A wife vanishes on her anniversary and suspicion falls on her husband.", "Rating": 4.1, "Publish_Year": 2012}, {"Book_ID": "B013", "Book_Name": "Dune", "Author": "Frank Herbert", "Genre": "Science Fiction", "Description": "A noble family takes control of a desert planet that produces the universe's most valuable resource.", "Rating": 4.28, "Publish_Year": 1965}, {"Book_ID": "B014", "Book_Name": "The Hunger Games", "Author": "Suzanne Collins", "Genre": "Dystopian", "Description": "A teenager volunteers to fight in a televised death match to save her sister.", "Rating": 4.34, "Publish_Year": 2008}, {"Book_ID": "B015", "Book_Name": "Think and Grow Rich", "Author": "Napoleon Hill", "Genre": "Self-Help", "Description": "A classic on the mindset and principles behind personal and financial success.", "Rating": 4.17, "Publish_Year": 1937}, {"Book_ID": "B016", "Book_Name": "A Brief History of Time", "Author": "Stephen Hawking", "Genre": "Science", "Description": "An accessible tour of black holes, the Big Bang and the nature of time.", "Rating": 4.21, "Publish_Year": 1988}, {"Book_ID": "B017", "Book_Name": "The Diary of a Young Girl", "Author": "Anne Frank", "Genre": "Biography", "Description": "A Jewish girl records two years in hiding from the Nazis in Amsterdam.", "Rating": 4.18, "Publish_Year": 1947}, {"Book_ID": "B018", "Book_Name": "Wings of Fire", "Author": "A.P.J. Abdul Kalam", "Genre": "Autobiography", "Description": "The life story of India's missile scientist and former President.", "Rating": 4.4, "Publish_Year": 1999}, {"Book_ID": "B019", "Book_Name": "The God of Small Things", "Author": "Arundhati Roy", "Genre": "Fiction", "Description": "A family in Kerala is shaped by a tragic event involving twins and forbidden love.", "Rating": 3.9, "Publish_Year": 1997}, {"Book_ID": "B020", "Book_Name": "Midnight's Children", "Author": "Salman Rushdie", "Genre": "Historical Fiction", "Description": "A man born at the moment of India's independence finds his life tied to the nation's fate.", "Rating": 3.9, "Publish_Year": 1981}, {"Book_ID": "B021", "Book_Name": "Ponniyin Selvan", "Author": "Kalki Krishnamurthy", "Genre": "Historical Fiction", "Description": "An epic of intrigue, war and succession in the Chola kingdom.", "Rating": 4.6, "Publish_Year": 1955}, {"Book_ID": "B022", "Book_Name": "The White Tiger", "Author": "Aravind Adiga", "Genre": "Fiction", "Description": "A driver tells how he climbed out of poverty in modern India by any means necessary.", "Rating": 3.7, "Publish_Year": 2008}, {"Book_ID": "B023", "Book_Name": "Rich Dad Poor Dad", "Author": "Robert Kiyosaki", "Genre": "Finance", "Description": "Contrasting lessons about money from two father figures.", "Rating": 4.1, "Publish_Year": 1997}, {"Book_ID": "B024", "Book_Name": "The Psychology of Money", "Author": "Morgan Housel", "Genre": "Finance", "Description": "Short stories showing how behavior matters more than knowledge when it comes to money.", "Rating": 4.4, "Publish_Year": 2020}, {"Book_ID": "B025", "Book_Name": "Thinking, Fast and Slow", "Author": "Daniel Kahneman", "Genre": "Psychology", "Description": "Explains the two systems of thought that drive our judgments and decisions.", "Rating": 4.19, "Publish_Year": 2011}, {"Book_ID": "B026", "Book_Name": "Murder on the Orient Express", "Author": "Agatha Christie", "Genre": "Mystery", "Description": "Detective Hercule Poirot investigates a murder aboard a snowbound train.", "Rating": 4.2, "Publish_Year": 1934}, {"Book_ID": "B027", "Book_Name": "The Girl with the Dragon Tattoo", "Author": "Stieg Larsson", "Genre": "Mystery", "Description": "A journalist and a hacker investigate a decades-old disappearance.", "Rating": 4.11, "Publish_Year": 2005}, {"Book_ID": "B028", "Book_Name": "It", "Author": "Stephen King", "Genre": "Horror", "Description": "A group of friends confront a shape-shifting evil that haunts their town.", "Rating": 4.25, "Publish_Year": 1986}, {"Book_ID": "B029", "Book_Name": "Dracula", "Author": "Bram Stoker", "Genre": "Horror", "Description": "A solicitor's visit to Transylvania unleashes a vampire on England.", "Rating": 4.01, "Publish_Year": 1897}, {"Book_ID": "B030", "Book_Name": "The Little Prince", "Author": "Antoine de Saint-Exupery", "Genre": "Fiction", "Description": "A pilot stranded in the desert meets a young prince from another planet.", "Rating": 4.3, "Publish_Year": 1943}, {"Book_ID": "B031", "Book_Name": "Life of Pi", "Author": "Yann Martel", "Genre": "Adventure", "Description": "A boy survives a shipwreck and shares a lifeboat with a Bengal tiger.", "Rating": 3.94, "Publish_Year": 2001}, {"Book_ID": "B032", "Book_Name": "The Kite Runner", "Author": "Khaled Hosseini", "Genre": "Fiction", "Description": "A story of friendship, betrayal and redemption set in Afghanistan.", "Rating": 4.34, "Publish_Year": 2003}, {"Book_ID": "B033", "Book_Name": "Educated", "Author": "Tara Westover", "Genre": "Memoir", "Description": "A woman raised in a survivalist family teaches herself enough to earn a PhD.", "Rating": 4.46, "Publish_Year": 2018}, {"Book_ID": "B034", "Book_Name": "Becoming", "Author": "Michelle Obama", "Genre": "Memoir", "Description": "The former First Lady reflects on her childhood, career and years in the White House.", "Rating": 4.5, "Publish_Year": 2018}, {"Book_ID": "B035", "Book_Name": "Ender's Game", "Author": "Orson Scott Card", "Genre": "Science Fiction", "Description": "A gifted child is trained in a military school to fight an alien threat.", "Rating": 4.3, "Publish_Year": 1985}, {"Book_ID": "B036", "Book_Name": "The Martian", "Author": "Andy Weir", "Genre": "Science Fiction", "Description": "An astronaut stranded on Mars must use science and humor to survive.", "Rating": 4.42, "Publish_Year": 2011}, {"Book_ID": "B037", "Book_Name": "Normal People", "Author": "Sally Rooney", "Genre": "Romance", "Description": "Two Irish teenagers drift together and apart over several years.", "Rating": 3.84, "Publish_Year": 2018}, {"Book_ID": "B038", "Book_Name": "The Fault in Our Stars", "Author": "John Green", "Genre": "Young Adult", "Description": "Two teenagers with cancer fall in love and confront mortality.", "Rating": 4.12, "Publish_Year": 2012}, {"Book_ID": "B039", "Book_Name": "Zero to One", "Author": "Peter Thiel", "Genre": "Business", "Description": "Notes on how to build companies that create something new.", "Rating": 4.17, "Publish_Year": 2014}, {"Book_ID": "B040", "Book_Name": "The Subtle Art of Not Giving a F*ck", "Author": "Mark Manson", "Genre": "Self-Help", "Description": "A blunt take on choosing what to care about for a better life.", "Rating": 3.92, "Publish_Year": 2016}, {"Book_ID": "B041", "Book_Name": "The Book Thief", "Author": "Markus Zusak", "Genre": "Historical Fiction", "Description": "A young girl in Nazi Germany steals books and shares them while her family hides a Jewish man.", "Rating": 4.39, "Publish_Year": 2005}, {"Book_ID": "B042", "Book_Name": "Brave New World", "Author": "Aldous Huxley", "Genre": "Dystopian", "Description": "An engineered society trades freedom for comfort, and one outsider questions it.", "Rating": 3.99, "Publish_Year": 1932}, {"Book_ID": "B043", "Book_Name": "The Fellowship of the Ring", "Author": "J.R.R. Tolkien", "Genre": "Fantasy", "Description": "Frodo sets out with eight companions to destroy a ring of terrible power.", "Rating": 4.38, "Publish_Year": 1954}, {"Book_ID": "B044", "Book_Name": "Man's Search for Meaning", "Author": "Viktor Frankl", "Genre": "Psychology", "Description": "A psychiatrist describes life in concentration camps and how purpose helps people endure.", "Rating": 4.37, "Publish_Year": 1946}, {"Book_ID": "B045", "Book_Name": "The Power of Now", "Author": "Eckhart Tolle", "Genre": "Spirituality", "Description": "A guide to living in the present moment and freeing yourself from overthinking.", "Rating": 4.15, "Publish_Year": 1997}, {"Book_ID": "B046", "Book_Name": "Shantaram", "Author": "Gregory David Roberts", "Genre": "Adventure", "Description": "An escaped convict builds a new life in the slums and underworld of Mumbai.", "Rating": 4.25, "Publish_Year": 2003}, {"Book_ID": "B047", "Book_Name": "The Immortals of Meluha", "Author": "Amish Tripathi", "Genre": "Mythology", "Description": "A retelling of the Shiva legend set in an ancient, idealized Indian civilization.", "Rating": 3.85, "Publish_Year": 2010}, {"Book_ID": "B048", "Book_Name": "Jurassic Park", "Author": "Michael Crichton", "Genre": "Science Fiction", "Description": "Cloned dinosaurs escape on a remote island theme park.", "Rating": 4.07, "Publish_Year": 1990}, {"Book_ID": "B049", "Book_Name": "Angels & Demons", "Author": "Dan Brown", "Genre": "Thriller", "Description": "A symbologist races to stop a secret society from destroying the Vatican.", "Rating": 3.94, "Publish_Year": 2000}, {"Book_ID": "B050", "Book_Name": "Wuthering Heights", "Author": "Emily Bronte", "Genre": "Classic", "Description": "A turbulent love and revenge story on the Yorkshire moors.", "Rating": 3.94, "Publish_Year": 1847}];
+
+const $ = (id) => document.getElementById(id);
+let selectedId = null;
+let activeQuery = "";
+let minRating = 3.5;
+let selectedGenre = "";
+let sortBy = "similarity";
+let recommendationCount = 5;
+let vectors = [];
+let idf = {};
+
+function tokenize(text){
+  const stop = new Set(["the","and","for","with","from","that","this","into","their","about","his","her","was","are","has","have","who","what","when","where","which","while","young","man","woman","book"]);
+  return (String(text || "").toLowerCase().match(/[a-z0-9]+/g) || []).filter(t => !stop.has(t));
+}
+function textOf(b){ return [b.Book_Name,b.Author,b.Genre,b.Description].join(" "); }
+function buildVectors(){
+  const docs = BOOKS.map(b => tokenize(textOf(b)));
+  const df = {};
+  docs.forEach(doc => [...new Set(doc)].forEach(t => df[t]=(df[t]||0)+1));
+  Object.keys(df).forEach(t => idf[t] = Math.log(1 + docs.length/(1+df[t])));
+  vectors = docs.map(doc => {
+    const counts = {};
+    doc.forEach(t => counts[t]=(counts[t]||0)+1);
+    const v = {};
+    Object.keys(counts).forEach(t => v[t]=(1+Math.log(counts[t]))*(idf[t]||1));
+    const norm = Math.sqrt(Object.values(v).reduce((s,x)=>s+x*x,0)) || 1;
+    Object.keys(v).forEach(t=>v[t]/=norm);
+    return v;
+  });
+}
+function similarity(i,j){
+  const a=vectors[i], b=vectors[j];
+  let s=0;
+  Object.keys(a).forEach(t=>{if(b[t])s+=a[t]*b[t]});
+  return s;
+}
+function esc(v){return String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function colorFor(s){let n=0;for(let i=0;i<s.length;i++)n=(n+s.charCodeAt(i)*(i+3))%360;return `linear-gradient(145deg,hsl(${n} 52% 58%),hsl(${(n+62)%360} 48% 25%))`;}
+function cover(title, small=false){return `<div class="cover" style="background:${colorFor(title)}" aria-hidden="true">▤</div>`;}
+function bookCard(b, score, idx){
+  return `<article class="book">
+    ${cover(b.Book_Name,true)}
+    <div>
+      <h3>${esc(b.Book_Name)}</h3>
+      <div class="meta">by ${esc(b.Author)}<br>${esc(b.Genre)} · ${esc(b.Publish_Year)}</div>
+      <p class="description">${esc(b.Description)}</p>
+      <div class="bookfoot"><span class="rating">★ ${Number(b.Rating).toFixed(2)}</span>${score==null?"":`<span class="sim">${Math.round(score*100)}% match</span>`}</div>
+      <button class="cardbtn" onclick="selectBook('${esc(b.Book_ID)}')">Find similar books →</button>
+    </div>
+  </article>`;
+}
+function currentFiltered(excludeSelected=false){
+  let arr=BOOKS.map((b,i)=>({...b,_i:i,_score:selectedId && selectedId!==b.Book_ID ? similarity(BOOKS.findIndex(x=>x.Book_ID===selectedId),i) : 0}));
+  if(activeQuery){
+    const q=activeQuery.toLowerCase();
+    arr=arr.filter(b=>String(b.Book_Name).toLowerCase().includes(q)||String(b.Author).toLowerCase().includes(q)||String(b.Genre).toLowerCase().includes(q));
+  }
+  if(selectedGenre) arr=arr.filter(b=>b.Genre===selectedGenre);
+  arr=arr.filter(b=>Number(b.Rating)>=minRating);
+  if(excludeSelected && selectedId) arr=arr.filter(b=>b.Book_ID!==selectedId);
+  arr.sort((a,b)=>{
+    if(sortBy==="rating") return Number(b.Rating)-Number(a.Rating);
+    if(sortBy==="year") return Number(b.Publish_Year)-Number(a.Publish_Year);
+    if(sortBy==="title") return String(a.Book_Name).localeCompare(String(b.Book_Name));
+    return b._score-a._score;
+  });
+  return arr;
+}
+function selectBook(id){
+  const b=BOOKS.find(x=>x.Book_ID===id);
+  if(!b)return;
+  selectedId=id; activeQuery=""; $("search").value=""; render();
+}
+function render(){
+  $("ratingLabel").textContent=minRating.toFixed(1)+"+";
+  const selected=BOOKS.find(b=>b.Book_ID===selectedId);
+  const selectedEl=$("selectedBook");
+  if(selected){
+    selectedEl.style.display="grid";
+    selectedEl.innerHTML=`${cover(selected.Book_Name)}<div><span class="pill">YOUR SELECTED BOOK</span><h3>${esc(selected.Book_Name)}</h3><div class="meta">by ${esc(selected.Author)} · ${esc(selected.Genre)} · ${selected.Publish_Year} · ★ ${Number(selected.Rating).toFixed(2)}</div><p class="description">${esc(selected.Description)}</p></div>`;
+  } else selectedEl.style.display="none";
+
+  let results;
+  if(selected){
+    const base=BOOKS.findIndex(b=>b.Book_ID===selectedId);
+    results=BOOKS.map((b,i)=>({...b,_i:i,_score:similarity(base,i)}))
+      .filter(b=>b.Book_ID!==selectedId && Number(b.Rating)>=minRating)
+      .filter(b=>!selectedGenre || b.Genre===selectedGenre);
+    if(activeQuery){
+      const q=activeQuery.toLowerCase();
+      results=results.filter(b=>String(b.Book_Name).toLowerCase().includes(q)||String(b.Author).toLowerCase().includes(q));
+    }
+    results.sort((a,b)=>{
+      if(sortBy==="rating")return Number(b.Rating)-Number(a.Rating);
+      if(sortBy==="year")return Number(b.Publish_Year)-Number(a.Publish_Year);
+      if(sortBy==="title")return String(a.Book_Name).localeCompare(String(b.Book_Name));
+      return b._score-a._score;
+    });
+    results=results.slice(0,recommendationCount);
+    $("resultCount").textContent=`Top matches for ${selected.Book_Name} · ${results.length} recommendation${results.length===1?"":"s"}`;
+  }else{
+    results=currentFiltered();
+    $("resultCount").textContent=`${results.length} book${results.length===1?"":"s"} found · Select a book to generate recommendations`;
+  }
+  $("recommendations").innerHTML=results.length?results.map(b=>bookCard(b,selected?b._score:null,b._i)).join(""):`<div class="empty"><div style="font-size:34px;margin-bottom:8px">📖</div><strong>No books found</strong><p>Try a different search or relax the filters.</p></div>`;
+}
+function setup(){
+  const genres=[...new Set(BOOKS.map(b=>b.Genre).filter(Boolean))].sort();
+  $("genreSelect").innerHTML='<option value="">All genres</option>'+genres.map(g=>`<option value="${esc(g)}">${esc(g)}</option>`).join("");
+  $("totalBooks").textContent=BOOKS.length;
+  $("totalGenres").textContent=genres.length;
+  $("avgRating").textContent=(BOOKS.reduce((s,b)=>s+Number(b.Rating||0),0)/BOOKS.length).toFixed(2);
+  $("search").addEventListener("input",e=>{activeQuery=e.target.value.trim(); if(selectedId) selectedId=null; render();});
+  $("searchBtn").addEventListener("click",()=>{
+    const q=$("search").value.trim().toLowerCase();
+    if(!q)return;
+    const match=BOOKS.find(b=>String(b.Book_Name).toLowerCase().includes(q)||String(b.Author).toLowerCase().includes(q));
+    if(match)selectBook(match.Book_ID); else {activeQuery=q;render();}
+  });
+  $("genreSelect").addEventListener("change",e=>{selectedGenre=e.target.value;render();});
+  $("ratingRange").addEventListener("input",e=>{minRating=Number(e.target.value);render();});
+  $("sortSelect").addEventListener("change",e=>{sortBy=e.target.value;render();});
+  $("countSelect").addEventListener("change",e=>{recommendationCount=Number(e.target.value);render();});
+  $("resetBtn").addEventListener("click",()=>{
+    activeQuery="";selectedId=null;selectedGenre="";minRating=0;sortBy="similarity";recommendationCount=5;
+    $("search").value="";$("genreSelect").value="";$("ratingRange").value=0;$("sortSelect").value="similarity";$("countSelect").value="5";render();
+  });
+  buildVectors();
+  // Start with a featured title so the page demonstrates the recommendation flow immediately.
+  const featured=BOOKS.find(b=>/The Hobbit/i.test(b.Book_Name))||BOOKS[0];
+  selectedId=featured.Book_ID;
+  render();
+}
+setup();
+</script>
+</body>
+</html>
